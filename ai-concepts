@@ -1,0 +1,32 @@
+Based on the provided exam materials and syllabus notes, here are some essential tips, key concepts, and common pitfalls to keep in mind for your Intro to Data Science exam:
+
+### 1. General Exam Tips & Rules
+
+The official exam instructions highlight several strategic tips for maximizing your score:
+
+* **Attempt Everything:** Try to answer all questions even if you are uncertain.
+* **Comment Your Code:** Leave clear comments explaining your thought process. You can receive partial points for your reasoning even if the code fails to run.
+* **Be Unambiguous:** For free-text answers, be VERY clear with your reasoning—there should be zero ambiguity in what you are referring to.
+* **Use LaTeX Formatting:** When writing math in Markdown cells, use LaTeX formatting (e.g., `$$f(x) = x^2$$`) to make it readable.
+* **Strict No-AI/No-Communication Policy:** You may not use Stack-Overflow, ChatGPT, or communicate with others; your activity will be monitored.
+
+### 2. Key Concepts to Master
+
+Make sure you are comfortable implementing and explaining the following core topics:
+
+* **Sampling Methods:** * *Inversion Sampling:* Understand how to invert the CDF, generating $X = F^{-1}(U)$.
+* *Acceptance-Rejection Sampling:* Understand how to filter samples using $U \le \frac{f(X)}{M g(X)}$.
+
+
+* **Monte Carlo Integration & Error Bounds:** Estimating integrals using sample means ($I = \mathbb{E}[h(X)]$) and constructing confidence intervals.
+* **Concentration Inequalities:** Applying Markov's, Chebyshev's, and Hoeffding's inequalities. For Hoeffding's CI, remember the formula for epsilon: $\epsilon = (b-a)\sqrt{\frac{\ln(2/\alpha)}{2n}}$.
+* **Markov Chains:** Be able to calculate transition matrices, stationary distributions, hitting times, irreducibility, periodicity, and reversibility. Remember that the rows of a transition matrix must sum to 1.0.
+* **PCA (Principal Component Analysis):** Know the 5-step pipeline: Center $\to$ SVD $\to$ Explained Variance $\to$ Projection $\to$ Reconstruction.
+* **Supervised Learning & Calibration:** Deriving normal equations, minimizing Logistic regression cross-entropy loss, and calibrating probabilities (using tools like a Decision Tree Regressor) before applying the Bayes rule threshold ($p \ge 0.5$).
+* **Statistical Learning Bounds:** Concepts like VC dimension, generalization gaps, and the Union Bound.
+
+### 3. Common Mistakes to Avoid
+
+* **Choosing a bad proposal distribution in Rejection Sampling:** Choosing a poor sampling distribution will result in an excessive amount of rejected samples (e.g., rejecting 9 times out of 10), which can cause autograder timeouts on the exam. Try to pick a proposal $g(x)$ such that $M \approx 1$.
+* **Forgetting to Center Data for PCA:** If you forget to mean-center your data before applying SVD, your first principal component will incorrectly just point toward the data mean instead of capturing the direction of maximum variance.
+* **Incorrect Hoeffding Bounds for Indicator Variables:** When constructing Hoeffding bounds for a 0-1 loss (accuracy/error rate), remember that the range $(b-a)$ is simply $1$.
