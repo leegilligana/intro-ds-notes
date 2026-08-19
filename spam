@@ -1,0 +1,106 @@
+To solve **Problem 2** from the exam notebook, you need to walk through a 4-part data science pipeline involving feature extraction, custom model creation (logistic regression), model calibration using a Decision Tree, and evaluating the final performance with confidence bounds.
+
+Here is the complete step-by-step solution to all parts of Question 2.
+
+### Part 1: Feature Engineering and Data Splitting
+
+As established earlier, you need to create binary indicators for the words `"free"`, `"prize"`, and `"win"`, and split the data into 40% training, 20% calibration, and 40% testing subsets without shuffling.
+
+```python
+import numpy as np
+import pandas as pd
+
+# Load data
+df = pd.read_csv("data/spam.csv", encoding='latin-1')
+
+# 1. Feature extraction
+x1 = df['v2'].astype(str).str.lower().str.contains('free').astype(int).to_numpy()
+x2 = df['v2'].astype(str).str.lower().str.contains('prize').astype(int).to_numpy()
+x3 = df['v2'].astype(str).str.lower().str.contains('win').astype(int).to_numpy()
+
+problem2_X = np.column_stack([x1, x2, x3])
+problem2_Y = (df['v1'].astype(str).str.lower() == 'spam').astype(int).to_numpy()
+
+# 2. Sequential Splitting (40% / 20% / 40%)
+n = len(problem2_X)
+n_train = int(0.4 * n)
+n_calib = int(0.2 * n)
+
+problem2_X_train = problem2_X[:n_train]
+problem2_X_calib = problem2_X[n_train:n_train + n_calib]
+problem2_X_test  = problem2_X[n_train + n_calib:]
+
+problem2_Y_train = problem2_Y[:n_train]
+problem2_Y_calib = problem2_Y[n_train:n_train + n_calib]
+problem2_Y_test  = problem2_Y[n_train + n_calib:]
+
+```
+
+### Part 2: Implementing the Proportional Model Loss Function
+
+The model calculates $\mathbb{P}(Y=1 \mid X) = G(\beta_0+\beta \cdot X)$. The loss function to minimize is the **mean negative log-likelihood (cross-entropy)**. To match the local test evaluation of `1.2828629` exactly, you can use `np.logaddexp` to prevent potential numeric overflow.
+
+```python
+class ProportionalSpam(object):
+    def __init__(self):
+        self.coeffs = None
+        self.result = None
+    
+    # define the objective/cost/loss function we want to minimise
+    def loss(self, X, Y, coeffs):
+        # z = beta_0 + X * beta
+        z = np.dot(X, coeffs[1:]) + coeffs[0]
+        # Mean Negative Log-Likelihood: mean( -Y*z + log(1 + exp(z)) )
+        return np.mean(np.logaddexp(0, z) - Y * z)
+
+    # (fit and predict methods remain as provided in the exam)
+
+```
+
+### Part 3: Model Training and Calibration
+
+Now we train our implemented `ProportionalSpam` classifier and calibrate its predictions using `sklearn.tree.DecisionTreeRegressor`.
+
+```python
+from sklearn.tree import DecisionTreeRegressor
+
+# 1. Train the ProportionalSpam model
+problem2_ps = ProportionalSpam()
+problem2_ps.fit(problem2_X_train, problem2_Y_train)
+
+# 2. Predict on calibration data and reshape to a 2D column vector (n_samples, 1)
+problem2_X_pred = problem2_ps.predict(problem2_X_calib).reshape(-1, 1)
+
+# 3. Train the calibrator using the calibration dataset
+problem2_calibrator = DecisionTreeRegressor()
+problem2_calibrator.fit(problem2_X_pred, problem2_Y_calib)
+
+```
+
+### Part 4: Final Evaluation and Hoeffding Inequality Bounds
+
+Finally, we apply both the trained logistic regression and the calibrator to the test set, calculate the 0-1 loss utilizing Bayes Rule ($p \ge 0.5$), and compute a 99% Hoeffding confidence interval.
+
+```python
+# 1. Make uncalibrated predictions on the test set
+test_preds_uncalibrated = problem2_ps.predict(problem2_X_test).reshape(-1, 1)
+
+# 2. Calibrate the test set predictions
+test_preds_calibrated = problem2_calibrator.predict(test_preds_uncalibrated)
+
+# 3. Convert calibrated probabilities to class predictions via Bayes Rule (threshold = 0.5)
+problem2_final_predictions = (test_preds_calibrated >= 0.5).astype(int)
+
+# 4. Compute 0-1 test loss (fraction of incorrect predictions)
+problem2_01_loss = float(np.mean(problem2_final_predictions != problem2_Y_test))
+
+# 5. Compute the 99% Hoeffding Confidence Interval
+# Formula: epsilon = (b - a) * sqrt( ln(2/alpha) / (2n) )
+# For indicator bounds (0 to 1), b - a = 1
+n_test = len(problem2_Y_test)
+alpha = 0.01  # 99% confidence means alpha is 1 - 0.99
+epsilon = np.sqrt(np.log(2 / alpha) / (2 * n_test))
+
+problem2_interval = (problem2_01_loss - epsilon, problem2_01_loss + epsilon)
+
+```
