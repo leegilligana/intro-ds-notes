@@ -1,0 +1,880 @@
+﻿Intro to Data Science Exam Prep
+
+
+Source Reference Repository: bluej1.github.io/IntroDSExamMaterial
+
+
+1. Core Concepts Overview
+* Sampling: Inversion sampling and acceptance-rejection sampling.
+
+* Markov Chains: Transition matrices, state distributions, hitting times, irreducibility, periodicity, and reversibility.
+
+* Monte Carlo Integration: Estimating integrals from samples, error bounds, and importance sampling.
+
+* Concentration Inequalities: Markov's, Chebyshev's, and Hoeffding's inequalities.
+
+* Statistical Learning Bounds: VC dimension, generalization gaps, and the Union Bound.
+
+* Dimensionality Reduction & PCA: Centering, SVD, explained variance, projection, and reconstruction .
+
+* Clustering & Ethics: Machine learning governance and fairness.
+2. Markov Chains
+2.1 The Transition Matrix ($P$)
+The foundation of every discrete Markov chain is the transition matrix $P$:
+
+
+   * 
+   * Rows ($i$): Represent the current origin state.
+   *    * 
+   * Columns ($j$): Represent the destination state.
+   *    * 
+   * Row Sum Property: Every row must sum to exactly $1.0$ ($\sum_j P_{ij} = 1$) because the system must transition somewhere.
+   * Python
+# Validation Check: Verify all row sums equal 1.0
+import numpy as np
+
+
+assert np.allclose(np.sum(P, axis=1), 1.0), "Matrix rows must sum to 1"
+
+
+
+
+2.2 State Probabilities ($P^n$)
+      * 
+      * Initial State ($\mu_0$): Defined as a row probability vector $\mu_0$ (e.g., $[1, 0, 0]$ means starting in State 0).
+      *       * 
+      * Distribution After $n$ Steps: $\mu_n = \mu_0 \cdot P^n$.
+      * Python
+# Distribution after 10 steps
+P_10 = np.linalg.matrix_power(P, 10)
+mu_10 = mu_0 @ P_10
+
+
+
+
+2.3 Stationary Distribution ($\pi$)
+The stationary distribution $\pi$ represents the long-term equilibrium proportion of time spent in each state. It satisfies two conditions:
+
+
+         1. 
+         2. Invariance: $\pi P = \pi$.
+         3.          4. 
+         5. Normalization: $\sum_i \pi_i = 1$ and $\pi_i \ge 0$.
+         6. Analytical / Hand Calculation Recipe
+            1. Expand $\pi P = \pi$ into a system of linear equations.
+            2.             3. Replace one redundant equation with $\sum \pi_i = 1$.
+            4.             5. Solve the system.
+            6. 
+
+Example (Courier Trucks - 2023 Exam):
+
+
+From \ To
+	Downtown (D)
+	Suburbs (S)
+	Countryside (C)
+	Downtown (D)
+	0.3
+	0.4
+	0.3
+	Suburbs (S)
+	0.2
+	0.5
+	0.3
+	Countryside (C)
+	0.4
+	0.3
+	0.3
+	
+
+	
+
+	
+
+	
+
+	Python Implementation
+To solve $\pi (P - I) = \mathbf{0} \iff (P^T - I) \pi^T = \mathbf{0}$ subject to $\sum \pi_i = 1$:
+
+
+Python
+N = P.shape[0]
+A = P.T - np.eye(N)
+A[-1] = np.ones(N)  # Replace last row with sum constraint
+b = np.zeros(N)
+b[-1] = 1.0
+
+
+stationary_dist = np.linalg.solve(A, b)
+
+
+
+
+2.4 Expected Hitting Times
+The expected hitting time $h_i$ is the average number of steps required to reach a target state $T$ starting from state $i$:
+
+
+            * 
+            * Target State: $h_T = 0$ (already at the target).
+            *             * 
+            * All Other States: $h_i = 1 + \sum_j P_{ij} h_j = 1 + \sum_{j \neq T} P_{ij} h_j$.
+            * 
+
+Exam Warning: Always remember to include the initial step ($+1$).
+
+
+Example Setup (Target = Suburbs $S$):
+               * 
+               * $h_S = 0$
+               *                * 
+               * $h_D = 1 + 0.3 h_D + 0.4(0) + 0.3 h_C \implies 0.7 h_D - 0.3 h_C = 1$
+               *                * 
+               * $h_C = 1 + 0.4 h_D + 0.3(0) + 0.3 h_C \implies -0.4 h_D + 0.7 h_C = 1$
+               * 2.5 Irreducibility & Reachability
+                  * 
+                  * Definition: A Markov chain is irreducible if all states communicate ($i \leftrightarrow j$), meaning every state can eventually reach every other state.
+                  *                   * 
+                  * Matrix Test: If there is some power $n$ such that $\sum_{k=1}^n P^k > 0$ strictly in all entries, the chain is irreducible.
+                  * 2.6 Periodicity & Aperiodicity
+                     * 
+                     * State Period: $d(i) = \gcd\{n \ge 1 : (P^n)_{ii} > 0\}$.
+                     *                      * 
+                     * Aperiodic State: $d(i) = 1$.
+                     *                      * 
+                     * Aperiodic Chain: Every state in the chain has period $d(i) = 1$.
+                     * Key Shortcuts
+                        1. 
+                        2. Class Property: In an irreducible Markov chain, all states share the exact same period.
+                        3.                         4. 
+                        5. Self-Loop Shortcut: If an irreducible chain contains any state with a self-loop ($P_{ii} > 0$), that state has return time $\gcd(1, \dots) = 1$. Thus, the entire chain is aperiodic.
+                        6.                         7. 
+                        8. Cycle Method: The period is the GCD of all cycle lengths returning to a state :
+                        9. 
+                           * Cycle lengths $\{4, 6\} \implies \gcd(4, 6) = 2$ (Periodic).
+                           *                            * Cycle lengths $\{4, 7\} \implies \gcd(4, 7) = 1$ (Aperiodic).
+                           * 2.7 Reversibility (Detailed Balance)
+A Markov chain is reversible if it satisfies the Detailed Balance Condition for all state pairs $(i, j)$:
+
+
+$$\pi_i P_{ij} = \pi_j P_{ji}$$
+
+
+                           * In matrix form: $\operatorname{diag}(\pi) P = P^T \operatorname{diag}(\pi)$.
+                           *                            * 
+                           * One-Way Arrow Test: If $P_{ij} > 0$ but $P_{ji} = 0$, detailed balance fails and the chain is not reversible.
+                           * 3. Sampling Techniques
+3.1 Inversion Sampling (Inverse Transform Method)
+Given a continuous CDF $F(x) = \int_{-\infty}^x f(t) \, dt$:
+
+
+                              1. Solve $u = F(x)$ algebraically for $x = F^{-1}(u)$.
+                              2.                               3. Draw uniform samples $U \sim \operatorname{Uniform}(0, 1)$.
+                              4.                               5. Compute exact samples $X = F^{-1}(U)$.
+                              6. Python
+# Example: F(x) = (exp(x^2) - 1) / (e - 1) on (0, 1)
+# Inverse: X = sqrt(ln(1 + (e - 1) * U))
+u = np.random.uniform(0, 1, size=n_samples)
+samples = np.sqrt(np.log(1 + (np.e - 1) * u))
+
+
+
+
+3.2 Rejection Sampling (Accept-Reject Method)
+Used when $F^{-1}(u)$ cannot be easily written in closed form:
+
+
+                              * 
+                              * Target Density: $f(x)$.
+                              *                               * 
+                              * Proposal Density: $g(x)$, which must cover the entire support of $f(x)$.
+                              *                               * 
+                              * Bounding Constant ($M$): $M \ge \max_x \frac{f(x)}{g(x)}$ such that $M \cdot g(x) \ge f(x)$ everywhere.
+                              *                               * 
+                              * Acceptance Probability: $\mathbb{P}(\text{Accept}) = \frac{1}{M}$.
+                              * Algorithm
+                                 1. Sample candidate $X \sim g(x)$.
+                                 2.                                  3. Draw uniform test value $U \sim \operatorname{Uniform}(0, 1)$.
+                                 4.                                  5. Accept $X$ if $U \le \frac{f(X)}{M \cdot g(X)}$; otherwise reject and repeat.
+                                 6. 3.3 Choosing an Efficient Proposal $g(x)$
+                                 * 
+                                 * Rule of Support: The domain of $g(x)$ must cover the full support of $f(x)$.
+                                 *                                  * 
+                                 * Rule of Dominance: $M \cdot g(x) \ge f(x)$ for all $x$ in the domain.
+                                 *                                  * Shape Matching (80/20 Rule):
+                                 * 
+                                    * If $f(x)$ is strictly increasing: Use a triangular distribution ($g(x) = 2x$) or power distribution ($g(x) \propto x^k$).
+                                    *                                     * If $f(x)$ is decreasing: Use an exponential distribution.
+                                    *                                     * 
+                                    * Emergency Fallback (The Box): Use a Uniform proposal $g(x) = \frac{1}{b - a}$.
+                                    * Power Proposal Recipe: $g(x) \propto x^k$ on $(0, B)$
+                                       1. Normalization: $\int_0^B C x^k \, dx = 1 \implies C = (k + 1) B^{-(k+1)}$.
+                                       2.                                        3. Sampling: Inverting $G(x) = (x/B)^{k+1}$ gives $X = B \cdot U^{\frac{1}{k+1}}$.
+                                       4. Python
+def rejection_sampler(n_samples):
+    samples = []
+    M = 1.0226  # Smallest valid bounding constant
+    batch_size = int(n_samples * 1.05) + 100
+
+
+    while len(samples) < n_samples:
+        u1 = np.random.uniform(0, 1, size=batch_size)
+        candidates = (1.0 / 20.0) * (u1 ** (1.0 / 21.0))
+
+
+        accept_probs = f(candidates) / (M * g(candidates))
+        u2 = np.random.uniform(0, 1, size=batch_size)
+
+
+        accepted = candidates[u2 <= accept_probs]
+        samples.extend(accepted)
+
+
+    return np.array(samples[:n_samples])
+
+
+
+
+4. Monte Carlo Methods
+4.1 Monte Carlo Integration
+To evaluate $I = \int_a^b h(x) f(x) \, dx = \mathbb{E}_{X \sim f}[h(X)]$:
+
+
+                                       * 
+                                       * Estimator: $\hat{I}_n = \frac{1}{n} \sum_{i=1}^n h(X_i)$ where $X_i \sim f(x)$.
+                                       *                                        * 
+                                       * Python: np.mean(h(samples)).
+                                       * 4.2 Error & Central Limit Theorem (CLT)
+By the Central Limit Theorem:
+
+
+$$\hat{I}_n \approx \mathcal{N}\left(I, \frac{\sigma^2}{n}\right)$$
+
+
+                                          * 
+                                          * Standard Error (SE): $\text{SE} = \frac{\text{std}(h(X))}{\sqrt{n}}$.
+                                          *                                           * 95% Confidence Interval (CLT): $[\hat{I}_n - 1.96 \cdot \text{SE}, \; [cite_start]\hat{I}_n + 1.96 \cdot \text{SE}]$.
+                                          * Python
+# Standard error is NOT the sample standard deviation
+se = np.std(h(samples)) / np.sqrt(len(samples))
+ci_95 = (np.mean(h(samples)) - 1.96 * se, np.mean(h(samples)) + 1.96 * se)
+
+
+
+
+4.3 Importance Sampling
+Used when evaluating rare events or when sampling directly from $f(x)$ is difficult :
+
+
+$$I = \int h(x) \frac{f(x)}{q(x)} q(x) \, dx = \mathbb{E}_{X \sim q}\left[ h(X) \frac{f(X)}{q(X)} \right]$$
+
+
+                                             * 
+                                             * Proposal Distribution: $q(x)$.
+                                             *                                              * 
+                                             * Importance Weight: $w(X_i) = \frac{f(X_i)}{q(X_i)}$.
+                                             *                                              * 
+                                             * Estimator: $\hat{I}_{\text{IS}} = \frac{1}{n} \sum_{i=1}^n h(X_i) w(X_i)$ where $X_i \sim q(x)$.
+                                             * 5. Concentration Inequalities
+5.1 Comparison Table
+Inequality
+	Required Information
+	Best Used For
+	Bound Tightness
+	
+
+Markov
+
+
+	Mean ($\mu$) only
+
+
+	Non-negative variables ($X \ge 0$)
+
+
+	Weakest
+
+
+	
+
+Chebyshev
+
+
+	Mean ($\mu$) & Variance ($\sigma^2$)
+
+
+	Any distribution with known variance
+
+
+	Medium
+
+
+	
+
+Hoeffding
+
+
+	Bounded Range ($[a, b]$)
+
+
+	Bounded variables (e.g., $0/1$ loss, bounded $h(x)$)
+
+
+	Strongest / Tightest
+
+
+	5.2 Markov's Inequality
+For a non-negative random variable $X \ge 0$ and threshold $a > 0$:
+
+
+$$\mathbb{P}(X \ge a) \le \frac{\mathbb{E}[X]}{a}$$
+
+
+5.3 Chebyshev's Inequality
+For any random variable with mean $\mu$ and variance $\sigma^2$:
+
+
+$$\mathbb{P}(\vert{}X - \mu\vert{} \ge \epsilon) \le \frac{\sigma^2}{\epsilon^2}$$
+
+
+                                                * 
+                                                * Sample Mean Formulation: For $\bar{X}_n = \frac{1}{n}\sum_{i=1}^n X_i$, $\operatorname{Var}(\bar{X}_n) = \frac{\sigma^2}{n}$:
+                                                * $$\mathbb{P}(\vert{}\bar{X}_n - \mu\vert{} \ge \epsilon) \le \frac{\sigma^2}{n \epsilon^2}$$
+
+
+5.4 Hoeffding's Inequality
+For independent bounded random variables $Y_i \in [a, b]$ with sample mean $\bar{Y}_n$ :
+
+
+$$\mathbb{P}(\vert{}\bar{Y}_n - \mathbb{E}[Y]\vert{} \ge \epsilon) \le 2 \exp\left( -\frac{2n\epsilon^2}{(b - a)^2} \right)$$
+
+
+Confidence Interval from Hoeffding
+Setting the error probability to $\alpha$ ($95\% \implies \alpha=0.05$; $99\% \implies \alpha=0.01$):
+
+
+$$\epsilon = (b - a) \sqrt{\frac{\ln(2/\alpha)}{2n}}$$
+
+
+$$\text{Confidence Interval} = [\bar{Y}_n - \epsilon, \; \bar{Y}_n + \epsilon]$$
+
+
+Exam Detail on Range $(b - a)$: * For 0–1 Classification Loss: $a = 0, b = 1 \implies b - a = 1$. * For Monte Carlo Estimator of $h(x)$ on $[0, 1]$: $b - a = \max h(x) - \min h(x)$ (e.g., for $h(x) = \sin(x)$, $b - a = \sin(1) - \sin(0) \approx 0.8415$).
+
+
+Sample Size Determination
+To achieve an error tolerance $\epsilon$ with confidence $(1 - \alpha)$:
+
+
+$$n = \frac{(b - a)^2 \ln(2/\alpha)}{2\epsilon^2}$$
+
+
+Tail Logic: Two-Sided vs. One-Sided Bounds
+                                                   * 
+                                                   * Two-Sided Interval: $\mathbb{P}(\vert{}\bar{X}_n - \mu\vert{} \ge \epsilon) \le 2e^{-\frac{2n\epsilon^2}{(b-a)^2}} \implies \text{Use } \ln(2/\alpha)$ .
+                                                   *                                                    * 
+                                                   * One-Sided Bound: $\mathbb{P}(\bar{X}_n - \mu \ge \epsilon) \le e^{-\frac{2n\epsilon^2}{(b-a)^2}} \implies \text{Use } \ln(1/\alpha)$ .
+                                                   * 6. Machine Learning Bounds
+6.1 VC Dimension & Generalization Gap
+With probability at least $1 - \alpha$, the test error on unseen data is bounded by:
+
+
+$$\text{Error}_{\text{test}} \le \text{Error}_{\text{train}} + \sqrt{\frac{d \left(\ln(2n/d) + 1\right) + \ln(4/\alpha)}{n}}$$
+
+
+                                                      * 
+                                                      * $d$: VC Dimension (model capacity/complexity).
+                                                      *                                                       * 
+                                                      * $n$: Number of training samples.
+                                                      *                                                       * 
+                                                      * $\alpha$: Failure probability.
+                                                      * 6.2 The Union Bound
+For events $A_1, A_2, \dots, A_k$:
+
+
+$$\mathbb{P}\left(\bigcup_{i=1}^k A_i\right) \le \sum_{i=1}^k \mathbb{P}(A_i)$$
+
+
+7. Principal Component Analysis (PCA) & SVD
+PCA projects high-dimensional data onto orthogonal axes that maximize variance.
+
+
+                    ┌───────────────────────────────┐
+                     │ 1. Center Data: X - mean(X)   │
+                     └───────────────┬───────────────┘
+                                     ▼
+                     ┌───────────────────────────────┐
+                     │ 2. Compute SVD: U, S, Vt      │
+                     └───────────────┬───────────────┘
+                                     ▼
+                     ┌───────────────────────────────┐
+                     │ 3. Explained Variance: S**2   │
+                     └───────────────┬───────────────┘
+                                     ▼
+                     ┌───────────────────────────────┐
+                     │ 4. Project: X_c @ Vt[:k, :].T │
+                     └───────────────┬───────────────┘
+                                     ▼
+                     ┌───────────────────────────────┐
+                     │ 5. Reconstruct: (Z @ Vt) + mu │
+                     └───────────────────────────────┘
+
+
+
+
+7.1 The 5-Step PCA Pipeline
+Step 1: Center the Data
+SVD finds directions of maximum spread relative to the origin. If uncentered, the first principal component simply points toward the data mean.
+
+
+Python
+X_mean = np.mean(X, axis=0)
+X_centered = X - X_mean
+
+
+
+
+Step 2: Singular Value Decomposition (SVD)
+Decompose centered data $X_{\text{centered}} = U \Sigma V^T$:
+
+
+                                                         * 
+                                                         * $U$ (Left Singular Vectors): Row / sample representations.
+                                                         *                                                          * 
+                                                         * $S$ (Singular Values $\Sigma$): Magnitude of spread along each axis.
+                                                         *                                                          * 
+                                                         * $V^T$ (Vt - Right Singular Vectors): The principal directions / components.
+                                                         * Python
+U, S, Vt = np.linalg.svd(X_centered, full_matrices=False)
+
+
+
+
+Step 3: Explained Variance Ratio
+Variance captured by component $i$ is proportional to $S_i^2$:
+
+
+Python
+variances = S**2
+explained_variance_ratio = variances / np.sum(variances)
+
+
+
+
+Step 4: Projection (Compression to $k$ Dimensions)
+Multiply centered data by the top $k$ principal component vectors:
+
+
+Python
+k = 2  # Target dimensions
+W = Vt[:k, :].T
+X_reduced = X_centered @ W
+
+
+
+
+Step 5: Reconstruction (Inverse PCA)
+Map the compressed representations back to the original feature space:
+
+
+Python
+X_reconstructed = (X_reduced @ Vt[:k, :]) + X_mean
+
+
+
+
+
+
+Aidan stuff:
+
+Comprehensive Exam Preparation Guide: 1MS041
+PART 1: Sampling, Monte Carlo & Concentration Inequalities
+                        [ Target Distribution F(x) ]
+                                      |
+                 -------------------------------------------
+                |                                           |
+     Can you invert F(x)?                       Is F(x) hard to invert?
+                |                                           |
+                v                                           v
+   [ Inverse Transform Method ]                    [ Rejection Sampling ]
+      1. Draw U ~ Uniform(0,1)                        1. Choose proposal g(x)
+      2. Set X = F^{-1}(U)                            2. Find M = max(f(x)/g(x))
+      (100% Acceptance Rate)                          3. Draw X ~ g, U ~ Uniform(0,1)
+                                                      4. Accept if U <= f(X)/(M*g(X))
+                                                            |
+                                                            v
+                                              [ Monte Carlo Integration ]
+                                                 E[h(X)] ≈ (1/n) Σ h(X_i)
+                                                            |
+                                                            v
+                                              [ Hoeffding's 1-α Interval ]
+                                                 ε = (b-a) * sqrt(ln(2/α)/(2n))
+
+
+1. The Inverse Transform Method
+When to Use
+Use this whenever the CDF $F(x)$ has an explicit, analytically invertible closed form.
+
+
+Mathematical Steps
+                                                            1. Take the given CDF $F(x)$.
+                                                            2.                                                             3. Set $u = F(x)$ and solve algebraically for $x$ in terms of $u$ to get $x = F^{-1}(u)$.
+                                                            4.                                                             5. Sample $U \sim \text{Uniform}(0, 1)$.
+                                                            6.                                                             7. Return $X = F^{-1}(U)$.
+                                                            8. Python Implementation Template
+Python
+import numpy as np
+
+
+
+
+def sample_inversion(n_samples=100000):
+    # 1. Draw uniform random numbers in (0, 1)
+    u = np.random.uniform(0, 1, size=n_samples)
+
+
+    # 2. Apply the mathematical inverse function F^{-1}(u)
+    # Example: F(x) = (exp(x^2) - 1) / (e - 1) => x = sqrt(ln(1 + (e - 1)*u))
+    x = np.sqrt(np.log(1 + (np.e - 1) * u))
+
+
+    return x
+
+
+2. Rejection Sampling (The Accept-Reject Method)
+When to Use
+Use this when you only have the density $f(x) = F'(x)$ or when $F(x)$ cannot be inverted analytically.
+
+
+Mathematical Steps
+                                                            1. Compute Target PDF $f(x)$: Differentiate the CDF: $f(x) = \frac{d}{dx} F(x)$.
+                                                            2.                                                             3. Choose a Proposal PDF $g(x)$: * Must cover the exact same support (domain) as $f(x)$.
+                                                            4. 
+                                                               * Must be easy to sample from (e.g., Uniform, standard power function $x^k$, Exponential).
+                                                               *                                                                * Normalize $g(x)$ so $\int_{\text{domain}} g(x) dx = 1$.
+                                                               *                                                                5. Find the Bounding Constant $M$:
+                                                               6. 
+                                                               7. $$M = \max_{x} \left( \frac{f(x)}{g(x)} \right)$$
+                                                               8. Acceptance probability is $\mathbb{P}(\text{Accept}) = \frac{1}{M}$. Aim for $M \approx 1$ to avoid timeouts.
+                                                               9.                                                                10. Sample & Filter (The 2D Dartboard Test):
+                                                               11. 
+                                                                  * Sample candidate $X \sim g(x)$.
+                                                                  *                                                                   * Sample $U \sim \text{Uniform}(0, 1)$.
+                                                                  *                                                                   * Accept $X$ if $U \le \frac{f(X)}{M \cdot g(X)}$.
+                                                                  * Python Implementation Template (Vectorized with Batching)
+Python
+import numpy as np
+
+
+
+
+def sample_rejection(n_samples=100000):
+    # Step 1: Target PDF
+    def f(x):
+        return 20.0 * (1.0 + 1.0 / x) * np.exp(20.0 - 1.0 / x)
+
+
+    # Step 2: Normalized Proposal PDF g(x) = (k+1)*20^(k+1)*x^k on (0, 1/20)
+    k = 20
+    C = (k + 1) * (20.0 ** (k + 1))
+
+
+    def g(x):
+        return C * (x**k)
+
+
+    # Step 3: Upper bound M
+    # Evaluated via scratchpad: M = np.max(f(grid) / g(grid))
+    M = 1.0226247739749612
+
+
+    # Step 4: Batch generation to prevent loops
+    samples = []
+    batch_size = int(n_samples * M * 1.05) + 100
+
+
+    while len(samples) < n_samples:
+        # Sample candidates from g(x) via inverse CDF: X = (1/20) * U1^(1/(k+1))
+        u1 = np.random.uniform(0, 1, size=batch_size)
+        candidates = (1.0 / 20.0) * (u1 ** (1.0 / (k + 1)))
+
+
+        # Acceptance threshold
+        accept_prob = f(candidates) / (M * g(candidates))
+
+
+        # Uniform test
+        u2 = np.random.uniform(0, 1, size=batch_size)
+        accepted = candidates[u2 <= accept_prob]
+        samples.extend(accepted)
+
+
+    return np.array(samples[:n_samples])
+
+
+3. Monte Carlo Integration
+When to Use
+Use this to approximate definite integrals of the form $I = \int_a^b h(x) f(x) \, dx$ using random draws.
+
+
+Mathematical Steps
+                                                                  1. Match the integral to the mathematical expectation $\mathbb{E}_{X \sim f}[h(X)]$ where $f(x)$ is a valid PDF integrating to $1$.
+                                                                  2.                                                                   3. Generate $n$ random samples $X_1, X_2, \dots, X_n \sim f(x)$.
+                                                                  4.                                                                   5. Compute the empirical sample mean:
+                                                                  6. 
+                                                                  7. $$\hat{I}_n = \frac{1}{n}\sum_{i=1}^n h(X_i)$$
+Python Implementation Template
+Python
+# samples are drawn from f(x)
+samples = sample_inversion(100000)
+
+
+# Integral of sin(x) * f(x) dx
+problem_integral = float(np.mean(np.sin(samples)))
+
+
+4. Hoeffding's Inequality & Confidence Intervals
+When to Use
+Use this to build distribution-free, finite-sample confidence intervals for bounded random variables $Y_i \in [a, b]$.
+
+
+Mathematical Formula
+For $n$ independent bounded variables $Y_i \in [a, b]$ with sample mean $\bar{Y}_n$:
+
+
+$$\mathbb{P}(\vert{}\bar{Y}_n - \mu\vert{} \ge \epsilon) \le 2 \exp\left( -\frac{2n\epsilon^2}{(b - a)^2} \right) = \alpha$$
+Solving for margin of error $\epsilon$ at confidence level $1 - \alpha$:
+
+
+$$\epsilon = (b - a) \sqrt{\frac{\ln(2 / \alpha)}{2n}}$$
+The $(1 - \alpha)$ Confidence Interval is:
+
+
+$$[\bar{Y}_n - \epsilon, \; \bar{Y}_n + \epsilon]$$
+Confidence Level (1−α)
+	Significance Level (α)
+	ln(2/α) Factor
+	95%
+	$0.05$
+	$\ln(40) \approx 3.68888$
+	99%
+	$0.01$
+	$\ln(200) \approx 5.29832$
+	Common Support Ranges $[a, b]$
+                                                                     * $0-1$ Classification Loss: $Y \in [0, 1] \implies (b - a) = 1.0$.
+                                                                     *                                                                      * Probabilities: $p \in [0, 1] \implies (b - a) = 1.0$.
+                                                                     *                                                                      * Integrand $\sin(X)$ for $X \in [0, 1]$: $Y \in [0, \sin(1)] \implies (b - a) = \sin(1) \approx 0.84147$.
+                                                                     * Python Implementation Template
+Python
+import numpy as np
+
+
+
+
+def hoeffding_interval(
+    sample_mean, n_samples, a_bound=0.0, b_bound=1.0, confidence=0.95
+):
+    alpha = 1.0 - confidence
+    b_minus_a = b_bound - a_bound
+
+
+    eps = b_minus_a * np.sqrt(np.log(2.0 / alpha) / (2.0 * n_samples))
+
+
+    lower_bound = float(max(a_bound, sample_mean - eps))
+    upper_bound = float(min(b_bound, sample_mean + eps))
+
+
+    return (lower_bound, upper_bound)
+
+
+PART 2: Discrete Markov Chains Analysis
+                             [ Markov Chain P ]
+                                      |
+                 -------------------------------------------
+                |                                           |
+      [ Graph Properties ]                        [ Equilibrium & Symmetry ]
+        - Irreducible?                              - Stationary Dist: π P = π
+          (All states communicate)                    (Exists for all finite chains)
+        - Periodicity d(i):                         - Reversibility:
+          gcd of return cycle lengths                 π_i * P_ij == π_j * P_ji
+          (Self-loop => Period 1)                     (No one-way directed edges)
+
+
+1. Constructing the Transition Matrix $P$
+The Golden Rule: Row $\to$ Column
+                                                                     * Rows ($i$): Starting / Origin state.
+                                                                     *                                                                      * Columns ($j$): Next / Destination state.
+                                                                     *                                                                      * Matrix Entry: $P_{ij} = \mathbb{P}(X_{t+1} = j \mid X_t = i)$.
+                                                                     *                                                                      * Row Sum Constraint: Every row must sum to 1.0 ($\sum_j P_{ij} = 1.0$).
+                                                                     * Python Example Setup
+Python
+import numpy as np
+
+
+# States: 0: A, 1: B, 2: C
+P = np.array(
+    [
+        [0.2, 0.8, 0.0],  # From state A
+        [0.5, 0.0, 0.5],  # From state B
+        [0.0, 1.0, 0.0],  # From state C
+    ]
+)
+
+
+2. Irreducibility
+Definition
+A Markov chain is irreducible if every state can reach every other state in a finite number of steps ($i \leftrightarrow j$ for all $i, j$).
+
+
+Quick Decision Rules
+                                                                     * Irreducible: The graph is strongly connected (no dead ends, no isolated clusters).
+                                                                     *                                                                      * Reducible (Not Irreducible):
+                                                                     * 
+                                                                        * Contains an absorbing state ($P_{ii} = 1$ with no exit arrows).
+                                                                        *                                                                         * Contains transient states (can go $A \to B$, but impossible to ever return $B \to A$).
+                                                                        *                                                                         * Contains disconnected subgraphs.
+                                                                        * 3. Periods & Aperiodicity
+Period $d(i)$
+The period is the Greatest Common Divisor (GCD) of all possible return loop lengths from state $i$ back to state $i$:
+
+
+$$d(i) = \gcd \{ n \ge 1 : (P^n)_{ii} > 0 \}$$
+Shortcuts for Fast Exam Solving
+                                                                        1. The Self-Loop Rule: If a state has a non-zero self-loop ($P_{ii} > 0$), its return time can be 1 step, so $d(i) = 1$ (Aperiodic).
+                                                                        2.                                                                         3. The Irreducible Equivalence Rule: In an irreducible Markov chain, all states have the exact same period.
+                                                                        4. 
+                                                                           * If the chain is irreducible and you find one state has a self-loop, all states have period 1, and the entire chain is aperiodic!
+                                                                           *                                                                            5. Bipartite Alternating Graph: If the chain bounces back and forth between two disjoint sets of states (e.g., $A \leftrightarrow B$), the return times are $\{2, 4, 6, \dots\} \implies \text{Period} = \mathbf{2}$.
+                                                                           6. 4. Stationary Distribution $\boldsymbol{\pi}$
+Definition
+A stationary distribution $\boldsymbol{\pi} = [\pi_0, \pi_1, \dots, \pi_{N-1}]$ satisfies:
+
+
+                                                                           1. $\boldsymbol{\pi} P = \boldsymbol{\pi}$ (Row vector multiplication).
+                                                                           2.                                                                            3. $\sum_{i=0}^{N-1} \pi_i = 1.0$.
+                                                                           4.                                                                            5. $\pi_i \ge 0$ for all $i$.
+                                                                           6. Key Theoretical Rules
+                                                                           * Existence: Every finite Markov chain has at least one stationary distribution (has_stationary is always True for finite chains).
+                                                                           *                                                                            * Uniqueness: If the chain is irreducible, the stationary distribution is strictly unique and positive ($\pi_i > 0$ for all $i$).
+                                                                           * Hand Solving System
+$$\begin{cases} \pi_0 = \sum_i \pi_i P_{i0} \\ \pi_1 = \sum_i \pi_i P_{i1} \\ \pi_0 + \pi_1 + \dots + \pi_{N-1} = 1 \end{cases}$$
+5. Reversibility (Detailed Balance)
+Definition
+A chain is reversible if at equilibrium, time looks the same moving forward or backward. It must satisfy the Detailed Balance Condition for every state pair $(i, j)$:
+
+
+$$\pi_i P_{ij} = \pi_j P_{ji} \quad \text{for all } i, j$$
+Visual Decision Rules
+                                                                           1. The One-Way Arrow Rule (Immediate Failure): If there is an arrow from $i \to j$ ($P_{ij} > 0$), but no return arrow from $j \to i$ ($P_{ji} = 0$), the chain is NOT reversible.
+                                                                           2.                                                                            3. Directed Cycles (Failure): A one-way circle ($A \to B \to C \to A$) creates net flow circulation, violating detailed balance.
+                                                                           4.                                                                            5. Line / Tree Graphs (Always Reversible): Any irreducible Markov chain structured as a line ($0 \leftrightarrow 1 \leftrightarrow 2 \leftrightarrow \dots$) or a tree without closed cycles is always reversible.
+                                                                           6. PART 3: Universal Python Toolkit for Problem 3
+Copy and run this cell during your exam to solve and verify any finite Markov chain automatically:
+Python
+import numpy as np
+
+
+
+
+def solve_markov_chain(P):
+    """Computes transition matrix properties for finite discrete Markov chains."""
+    n = P.shape[0]
+
+
+    # 1. Irreducibility (Reachability via sum_{k=1}^N P^k)
+    reach = np.zeros_like(P, dtype=float)
+    p_k = np.eye(n)
+    for _ in range(n):
+        p_k = p_k @ P
+        reach += p_k
+    is_irreducible = bool(np.all(reach > 1e-9))
+
+
+    # 2. Periods of each state
+    periods = np.zeros(n, dtype=int)
+    for i in range(n):
+        return_times = []
+        p_k = np.eye(n)
+        for t in range(1, 2 * n + 1):
+            p_k = p_k @ P
+            if p_k[i, i] > 1e-9:
+                return_times.append(t)
+        periods[i] = np.gcd.reduce(return_times) if return_times else 0
+
+
+    is_aperiodic = bool(np.all(periods == 1))
+
+
+    # 3. Stationary Distribution (pi * P = pi, sum(pi) = 1)
+    # Solve system: [P.T - I; 1^T] * pi^T = [0; 1]
+    A = np.vstack([(P.T - np.eye(n)), np.ones((1, n))])
+    b = np.append(np.zeros(n), 1.0)
+    pi, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+
+
+    has_stationary = True
+    # Clean small floating-point errors
+    pi = np.where(np.abs(pi) < 1e-12, 0.0, pi)
+    stationary_dist = pi if np.all(pi >= -1e-6) else False
+
+
+    # 4. Reversibility (Detailed Balance: pi_i * P_ij == pi_j * P_ji)
+    if stationary_dist is not False:
+        D = np.diag(stationary_dist)
+        flow_diff = D @ P - P.T @ D
+        is_reversible = bool(np.allclose(flow_diff, 0, atol=1e-6))
+    else:
+        is_reversible = False
+
+
+    return {
+        "is_irreducible": is_irreducible,
+        "is_aperiodic": is_aperiodic,
+        "periods": periods,
+        "has_stationary": has_stationary,
+        "stationary_dist": stationary_dist,
+        "is_reversible": is_reversible,
+    }
+
+
+PART 4: Summary Comparison Table
+Problem Area
+	Key Concept / Condition
+	Formula / Rule
+	Python Code Target
+	Problem 1.1
+	Inversion Sampling
+	$X = F^{-1}(U)$
+	F_inv(np.random.uniform(0, 1, n))
+	Problem 1.3
+	Monte Carlo Integral
+	$I = \mathbb{E}[h(X)]$
+	float(np.mean(h(samples)))
+	Problem 1.4
+	Hoeffding CI
+	$\epsilon = (b-a)\sqrt{\frac{\ln(2/\alpha)}{2n}}$
+	(mean - eps, mean + eps)
+	Problem 1.5
+	Fast Rejection
+	$U \le \frac{f(X)}{M g(X)}$ with $M \approx 1$
+	Vectorized batch rejection
+	Problem 3.1
+	Transition Matrix
+	$\sum_j P_{ij} = 1.0$
+	P[i, j] = prob(i -> j)
+	Problem 3.2
+	Irreducibility
+	$i \leftrightarrow j \quad \forall i, j$
+	all(sum(P^k) > 0)
+	Problem 3.3
+	Aperiodicity
+	$\gcd(\text{return loops}) = 1$
+	periods == np.array([1, 1, ...])
+	Problem 3.4
+	Stationary Distribution
+	$\boldsymbol{\pi} P = \boldsymbol{\pi}, \; \sum \pi_i = 1$
+	np.linalg.lstsq(A, b)
+	Problem 3.5
+	Reversibility
+	$\pi_i P_{ij} = \pi_j P_{ji} \quad \forall i, j$
+	np.allclose(diag(pi)@P, P.T@diag(pi))
